@@ -1,12 +1,15 @@
 #!/usr/bin/env python3
 
+import sys
+sys.path.append("..")
+
 import angr
 import pyvex
 import claripy
-import am_graph
 import struct
-import sys
 from collections import defaultdict
+
+import am_graph
 
 import logging
 logging.getLogger('angr.state_plugins.symbolic_memory').setLevel(logging.ERROR)
