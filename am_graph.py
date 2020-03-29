@@ -94,6 +94,15 @@ def to_supergraph(transition_graph):
             # might be an isolated node
             continue
 
+        # Take src_supernode off the graph since we might modify it
+        if src_supernode in super_graph:
+            existing_in_edges = list(super_graph.in_edges(src_supernode, data=True))
+            existing_out_edges = list(super_graph.out_edges(src_supernode, data=True))
+            super_graph.remove_node(src_supernode)
+        else:
+            existing_in_edges = [ ]
+            existing_out_edges = [ ]
+
         for dst, data in dests_and_data.items():
 
             edge = (node, dst)
@@ -122,7 +131,7 @@ def to_supergraph(transition_graph):
                         super_graph.add_edge(src_supernode, dst_, **data_)
 
                     # link all in edges of dst_supernode to src_supernode
-                    for src_, _, data_ in super_graph.in_edges([dst_supernode], data=True):
+                    for src_, _, data_ in super_graph.in_edges(dst_supernode, data=True):
                         super_graph.add_edge(src_, src_supernode, **data_)
 
                         if 'type' in data_ and data_['type'] == 'transition':
@@ -159,6 +168,14 @@ def to_supergraph(transition_graph):
                                                       dst_supernode.addr
                                                       )
 
+        # add back the node (in case there are no edges)
+        super_graph.add_node(src_supernode)
+        # add back the old edges
+        for src, _, data in existing_in_edges:
+            super_graph.add_edge(src, src_supernode, **data)
+        for _, dst, data in existing_out_edges:
+            super_graph.add_edge(src_supernode, dst, **data)
+
     for node in function_nodes:
         in_edges = transition_graph.in_edges(node, data=True)
 
@@ -173,7 +190,7 @@ def to_supergraph(transition_graph):
     return super_graph
 
 
-class OutBranch(object):
+class OutBranch:
     def __init__(self, ins_addr, stmt_idx, branch_type):
         self.ins_addr = ins_addr
         self.stmt_idx = stmt_idx
@@ -182,6 +199,8 @@ class OutBranch(object):
         self.targets = set()
 
     def __repr__(self):
+        if self.ins_addr is None:
+            return "<OutBranch at None, type %s>" % self.type
         return "<OutBranch at %#x, type %s>" % (self.ins_addr, self.type)
 
     def add_target(self, addr):
@@ -221,7 +240,7 @@ class OutBranch(object):
         return hash((self.ins_addr, self.stmt_idx, self.type))
 
 
-class SuperCFGNode(object):
+class SuperCFGNode:
     def __init__(self, addr):
         self.addr = addr
 
