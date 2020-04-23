@@ -78,7 +78,7 @@ Successful! The recovered file: check_passwd_flat_recovered
 > `0x080483e0 `是函数`target_function()`的地址。
 
 ```shell
-(angr-dev) <path>/deflat/bogus_control_flow$ python3 debogus.py -f samples/bin/target_x86_bogus 0x80483e0
+(angr-dev) <path>/deflat/bogus_control_flow$ python3 debogus.py -f samples/bin/target_x86_bogus --addr 0x80483e0
 *******************symbolic execution*********************
 executed blocks:  ['0x8048686', '0x804868b', '0x8048991', '0x8048592', '0x8048914', '0x8048715', '0x8048897', '0x8048720', '0x8048725', '0x80484ab', '0x804862c', '0x804842e', '0x80484b6', '0x80484bb', '0x80487bb', '0x80487c0', '0x80486c7', '0x8048950', '0x8048551', '0x80488d3', '0x8048955', '0x8048556', '0x8048856', '0x80489d8', '0x80488d8', '0x804885b', '0x80483e0', '0x80485e0', '0x8048761', '0x80485eb', '0x80485f0', '0x80484f7', '0x80487fc']
 ************************patch******************************
