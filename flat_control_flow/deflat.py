@@ -33,7 +33,7 @@ def get_relevant_nop_nodes(supergraph, pre_dispatcher_node, prologue_node, retn_
     return relevant_nodes, nop_nodes
 
 
-def symbolic_execution(project, relevant_block_addrs, start_addr, hook_addr=None, modify_value=None, inspect=False):
+def symbolic_execution(project, relevant_block_addrs, start_addr, hook_addrs=None, modify_value=None, inspect=False):
 
     def retn_procedure(state):
         ip = state.solver.eval(state.regs.ip)
@@ -47,11 +47,13 @@ def symbolic_execution(project, relevant_block_addrs, start_addr, hook_addr=None
             state.scratch.temps[expressions[0].cond.tmp] = modify_value
             state.inspect._breakpoints['statement'] = []
 
-    if hook_addr != None:
+    if hook_addrs is not None:
+        skip_length = 4
         if project.arch.name in ARCH_X86:
-            project.hook(hook_addr, retn_procedure, length=5)
-        elif project.arch.name in ARCH_ARM:
-            project.hook(hook_addr, retn_procedure, length=4)
+            skip_length = 5
+
+        for hook_addr in hook_addrs:
+            project.hook(hook_addr, retn_procedure, length=skip_length)
 
     state = project.factory.blank_state(addr=start_addr, remove_options={
                                         angr.sim_options.LAZY_SOLVES})
@@ -131,34 +133,44 @@ def main():
         print('-------------------dse %#x---------------------' % relevant.addr)
         block = project.factory.block(relevant.addr, size=relevant.size)
         has_branches = False
-        hook_addr = None
+        hook_addrs = set([])
         for ins in block.capstone.insns:
             if project.arch.name in ARCH_X86:
                 if ins.insn.mnemonic.startswith('cmov'):
-                    patch_instrs[relevant] = ins
-                    has_branches = True
+                    # only record the first one
+                    if relevant not in patch_instrs:
+                        patch_instrs[relevant] = ins
+                        has_branches = True
                 elif ins.insn.mnemonic.startswith('call'):
-                    hook_addr = ins.insn.address
+                    hook_addrs.add(ins.insn.address)
             elif project.arch.name in ARCH_ARM:
                 if ins.insn.mnemonic != 'mov' and ins.insn.mnemonic.startswith('mov'):
-                    patch_instrs[relevant] = ins
-                    has_branches = True
+                    if relevant not in patch_instrs:
+                        patch_instrs[relevant] = ins
+                        has_branches = True
                 elif ins.insn.mnemonic in {'bl', 'blx'}:
-                    hook_addr = ins.insn.address
+                    hook_addrs.add(ins.insn.address)
+            elif project.arch.name in ARCH_ARM64:
+                if ins.insn.mnemonic.startswith('cset'):
+                    if relevant not in patch_instrs:
+                        patch_instrs[relevant] = ins
+                        has_branches = True
+                elif ins.insn.mnemonic in {'bl', 'blr'}:
+                    hook_addrs.add(ins.insn.address)
+
         if has_branches:
             flow[relevant].append(symbolic_execution(project, relevant_block_addrs,
-                                                     relevant.addr, hook_addr, claripy.BVV(1, 1), True))
+                                                     relevant.addr, hook_addrs, claripy.BVV(1, 1), True))
             flow[relevant].append(symbolic_execution(project, relevant_block_addrs,
-                                                     relevant.addr, hook_addr, claripy.BVV(0, 1), True))
+                                                     relevant.addr, hook_addrs, claripy.BVV(0, 1), True))
         else:
             flow[relevant].append(symbolic_execution(
-                project, relevant_block_addrs, relevant.addr, hook_addr))
+                project, relevant_block_addrs, relevant.addr, hook_addrs))
 
     print('************************flow******************************')
     for k, v in flow.items():
         print('%#x: ' % k.addr, [hex(child) for child in v])
 
-    # print retn_node flow. Actually, it's [].
     print('%#x: ' % retn_node.addr, [])
 
     print('************************patch*****************************')
@@ -185,13 +197,18 @@ def main():
             if project.arch.name in ARCH_X86:
                 fill_nop(origin_data, file_offset,
                          last_instr.size, project.arch)
-                jmp_opcode = OPCODES['x86']['jmp']
-                jmp_offset = childs[0] - last_instr.address - 5
-                patch_value = jmp_opcode+struct.pack('<i', jmp_offset)
+                patch_value = ins_j_jmp_hex_x86(last_instr.address, childs[0], 'jmp')
             elif project.arch.name in ARCH_ARM:
-                b_opcode = OPCODES['arm']['b']
-                b_offset = (childs[0] - last_instr.address - 4*2) // 4
-                patch_value = struct.pack('<i', b_offset)[:-1]+b_opcode
+                patch_value = ins_b_jmp_hex_arm(last_instr.address, childs[0], 'b')
+                if project.arch.memory_endness == "Iend_BE":
+                    patch_value = patch_value[::-1]
+            elif project.arch.name in ARCH_ARM64:
+                # FIXME: For aarch64/arm64, the last instruction of prologue seems useful in some cases, so patch the next instruction instead.
+                if parent.addr == start:
+                    file_offset += 4
+                    patch_value = ins_b_jmp_hex_arm64(last_instr.address+4, childs[0], 'b')
+                else:
+                    patch_value = ins_b_jmp_hex_arm64(last_instr.address, childs[0], 'b')
                 if project.arch.memory_endness == "Iend_BE":
                     patch_value = patch_value[::-1]
             patch_instruction(origin_data, file_offset, patch_value)
@@ -203,32 +220,38 @@ def main():
                      parent.size - base_addr - file_offset, project.arch)
             if project.arch.name in ARCH_X86:
                 # patch the cmovx instruction to jx instruction
-                jmpx_opcode = OPCODES['x86']['j'] + \
-                    OPCODES['x86'][instr.mnemonic[len('cmov'):]]
-                jmpx_offset = childs[0] - instr.address - 6
-                patch_value = jmpx_opcode + struct.pack('<i', jmpx_offset)
+                patch_value = ins_j_jmp_hex_x86(instr.address, childs[0], instr.mnemonic[len('cmov'):])
                 patch_instruction(origin_data, file_offset, patch_value)
 
                 file_offset += 6
                 # patch the next instruction to jmp instrcution
-                jmp_opcode = OPCODES['x86']['jmp']
-                jmp_offset = childs[1] - (instr.address + 6) - 5
-                patch_value = jmp_opcode + struct.pack('<i', jmp_offset)
+                patch_value = ins_j_jmp_hex_x86(instr.address+6, childs[1], 'jmp')
                 patch_instruction(origin_data, file_offset, patch_value)
             elif project.arch.name in ARCH_ARM:
                 # patch the movx instruction to bx instruction
-                bx_opcode = OPCODES['arm']['b'+instr.mnemonic[len('mov'):]]
-                bx_offset = (childs[0] - instr.address - 4*2) // 4
-                patch_value = struct.pack('<i', bx_offset)[:-1] + bx_opcode
+                bx_cond = 'b' + instr.mnemonic[len('mov'):]
+                patch_value = ins_b_jmp_hex_arm(instr.address, childs[0], bx_cond)
                 if project.arch.memory_endness == 'Iend_BE':
                     patch_value = patch_value[::-1]
                 patch_instruction(origin_data, file_offset, patch_value)
 
                 file_offset += 4
                 # patch the next instruction to b instrcution
-                b_opcode = OPCODES['arm']['b']
-                b_offset = (childs[1] - (instr.address + 4) - 4*2) // 4
-                patch_value = struct.pack('<i', b_offset)[:-1] + b_opcode
+                patch_value = ins_b_jmp_hex_arm(instr.address+4, childs[1], 'b')
+                if project.arch.memory_endness == 'Iend_BE':
+                    patch_value = patch_value[::-1]
+                patch_instruction(origin_data, file_offset, patch_value)
+            elif project.arch.name in ARCH_ARM64:
+                # patch the cset.xx instruction to bx instruction
+                bx_cond = instr.op_str.split(',')[-1].strip()
+                patch_value = ins_b_jmp_hex_arm64(instr.address, childs[0], bx_cond)
+                if project.arch.memory_endness == 'Iend_BE':
+                    patch_value = patch_value[::-1]
+                patch_instruction(origin_data, file_offset, patch_value)
+
+                file_offset += 4
+                # patch the next instruction to b instruction
+                patch_value = ins_b_jmp_hex_arm64(instr.address+4, childs[1], 'b')
                 if project.arch.memory_endness == 'Iend_BE':
                     patch_value = patch_value[::-1]
                 patch_instruction(origin_data, file_offset, patch_value)
