@@ -85,17 +85,18 @@ def main():
             if len(suc_nodes) > 1 and len(jmp_targets) == 1:
                 if project.arch.name in ARCH_X86:
                     file_offset = node.addr + node.size - 6 - base_addr
-                    jmp_opcode = OPCODES['x86']['jmp']
-                    jmp_offset = jmp_targets[0] - (node.addr + node.size)
-                    patch_value = OPCODES['x86']['nop'] + \
-                        jmp_opcode + struct.pack('<i', jmp_offset)
+                    # nop + jmp
+                    patch_value = OPCODES['x86']['nop'] + ins_j_jmp_hex_x86(node.addr + node.size - 5, jmp_targets[0], 'jmp')
                     patch_instruction(origin_data, file_offset, patch_value)
                 elif project.arch.name in ARCH_ARM:
                     file_offset = node.addr + node.size - 4 - base_addr
-                    b_opcode = OPCODES['arm']['b']
-                    b_offset = (jmp_targets[0] -
-                                (node.addr + node.size + 4)) // 4
-                    patch_value = struct.pack('<i', b_offset)[:-1] + b_opcode
+                    patch_value = ins_b_jmp_hex_arm(node.addr + node.size - 4, jmp_targets[0], 'b')
+                    if project.arch.memory_endness == 'Iend_BE':
+                        patch_value = patch_value[::-1]
+                    patch_instruction(origin_data, file_offset, patch_value)
+                elif project.arch.name in ARCH_ARM64:
+                    file_offset = node.addr + node.size - 4 - base_addr
+                    patch_value = ins_b_jmp_hex_arm64(node.addr + node.size - 4, jmp_targets[0], 'b')
                     if project.arch.memory_endness == 'Iend_BE':
                         patch_value = patch_value[::-1]
                     patch_instruction(origin_data, file_offset, patch_value)

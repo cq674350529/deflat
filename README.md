@@ -6,7 +6,7 @@
 
 基于`SnowGirls`的[deflat](https://github.com/SnowGirls/deflat)，利用[angr](https://github.com/angr/angr)框架实现去除控制流平坦化，详细内容请参考[利用符号执行去除控制流平坦化](https://security.tencent.com/index.php/blog/msg/112) 。
 
-> 脚本仅依赖于`angr`框架，使用的`angr`版本为`8.19.4.5`
+> 脚本仅依赖于`angr`框架，测试使用的`angr`版本为`8.19.4.5`
 
 ### Usage
 
@@ -92,7 +92,7 @@ Successful! The recovered file: ./target_bogus_recovered
 目前，脚本仅在以下架构的程序上进行测试:
 
 + `x86`系列:`x86`, `x86_64`
-+ `arm`系列:`ARMEL`, `ARMHF` (`armv7 32bit`)
++ `arm`系列:`arm`(`armv7`), `arm64/aarch64`(`armv8`)
 
 ### Misc
 
@@ -104,8 +104,8 @@ Successful! The recovered file: ./target_bogus_recovered
 
 ## Requirements
 
-- 安装`python3`
-- 安装`angr`  
+- `python3`
+- `angr`
 
 ## Reference
 
