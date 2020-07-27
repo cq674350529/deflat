@@ -68,6 +68,8 @@ def symbolic_execution(project, relevant_block_addrs, start_addr, hook_addrs=Non
                 return active_state.addr
         sm.step()
 
+    return None
+
 
 def main():
     parser = argparse.ArgumentParser(description="deflat control flow script")
@@ -97,7 +99,7 @@ def main():
     for node in supergraph.nodes():
         if supergraph.in_degree(node) == 0:
             prologue_node = node
-        if supergraph.out_degree(node) == 0:
+        if supergraph.out_degree(node) == 0 and len(node.out_branches) == 0:
             retn_node = node
 
     if prologue_node is None or prologue_node.addr != start:
@@ -159,13 +161,19 @@ def main():
                     hook_addrs.add(ins.insn.address)
 
         if has_branches:
-            flow[relevant].append(symbolic_execution(project, relevant_block_addrs,
-                                                     relevant.addr, hook_addrs, claripy.BVV(1, 1), True))
-            flow[relevant].append(symbolic_execution(project, relevant_block_addrs,
-                                                     relevant.addr, hook_addrs, claripy.BVV(0, 1), True))
+            tmp_addr = symbolic_execution(project, relevant_block_addrs,
+                                                     relevant.addr, hook_addrs, claripy.BVV(1, 1), True)
+            if tmp_addr is not None:
+                flow[relevant].append(tmp_addr)
+            tmp_addr = symbolic_execution(project, relevant_block_addrs,
+                                                     relevant.addr, hook_addrs, claripy.BVV(0, 1), True)
+            if tmp_addr is not None:
+                flow[relevant].append(tmp_addr)
         else:
-            flow[relevant].append(symbolic_execution(
-                project, relevant_block_addrs, relevant.addr, hook_addrs))
+            tmp_addr = symbolic_execution(project, relevant_block_addrs,
+                                                     relevant.addr, hook_addrs)
+            if tmp_addr is not None:
+                flow[relevant].append(tmp_addr)
 
     print('************************flow******************************')
     for k, v in flow.items():

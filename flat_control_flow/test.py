@@ -10,7 +10,7 @@ test_location = os.path.dirname(os.path.realpath(__file__))
 
 
 def run_deflat(binary, addr):
-    os.system("python36 ./deflat.py -f %s --addr %#x" % (binary, addr))
+    os.system("python3 ./deflat.py -f %s --addr %#x" % (binary, addr))
 
 
 def test_flat_control_flow():
