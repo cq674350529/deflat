@@ -8,7 +8,7 @@ import util
 test_location = os.path.dirname(os.path.realpath(__file__))
 
 def run_debogus(binary, addr):
-    os.system("python36 ./debogus.py -f %s --addr %#x" % (binary, addr))
+    os.system("python3 ./debogus.py -f %s --addr %#x" % (binary, addr))
 
 
 def test_bogus_control_flow():
