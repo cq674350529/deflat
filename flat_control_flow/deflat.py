@@ -88,11 +88,13 @@ def main():
     project = angr.Project(filename, load_options={'auto_load_libs': False})
     # do normalize to avoid overlapping blocks, disable force_complete_scan to avoid possible "wrong" blocks
     cfg = project.analyses.CFGFast(normalize=True, force_complete_scan=False)
+    base_addr = project.loader.main_object.mapped_base >> 12 << 12
     target_function = cfg.functions.get(start)
+    if target_function is None:
+        target_function = cfg.kb.functions.get_by_addr(base_addr + start)
+
     # A super transition graph is a graph that looks like IDA Pro's CFG
     supergraph = am_graph.to_supergraph(target_function.transition_graph)
-
-    base_addr = project.loader.main_object.mapped_base >> 12 << 12
 
     # get prologue_node and retn_node
     prologue_node = None
