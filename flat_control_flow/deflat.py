@@ -104,7 +104,7 @@ def main():
         if supergraph.out_degree(node) == 0 and len(node.out_branches) == 0:
             retn_node = node
 
-    if prologue_node is None or prologue_node.addr != start:
+    if prologue_node is None or prologue_node.addr not in [start, base_addr + start]:
         print("Something must be wrong...")
         sys.exit(-1)
 
@@ -117,7 +117,7 @@ def main():
     relevant_nodes, nop_nodes = get_relevant_nop_nodes(
         supergraph, pre_dispatcher_node, prologue_node, retn_node)
     print('*******************relevant blocks************************')
-    print('prologue: %#x' % start)
+    print('prologue: %#x' % prologue_node.addr)
     print('main_dispatcher: %#x' % main_dispatcher_node.addr)
     print('pre_dispatcher: %#x' % pre_dispatcher_node.addr)
     print('retn: %#x' % retn_node.addr)
@@ -214,7 +214,7 @@ def main():
                     patch_value = patch_value[::-1]
             elif project.arch.name in ARCH_ARM64:
                 # FIXME: For aarch64/arm64, the last instruction of prologue seems useful in some cases, so patch the next instruction instead.
-                if parent.addr == start:
+                if parent.addr in [start, base_addr + start]:
                     file_offset += 4
                     patch_value = ins_b_jmp_hex_arm64(last_instr.address+4, childs[0], 'b')
                 else:
