@@ -73,12 +73,12 @@ def ins_b_jmp_hex_arm64(cur_addr, target_addr, b_cond):
     if b_cond == 'b':
         # reference: https://blog.csdn.net/qianlong4526888/article/details/8247219
         if cur_addr > target_addr:
-            patch_ins_hex = struct.pack('<I', ((0x14000000 | 0x03ffffff) - (cur_addr - target_addr) // 4))
+            patch_ins_hex = struct.pack('<I', ((0x14000000 | 0x03ffffff) - (cur_addr - target_addr - 4) // 4))
         else:
             patch_ins_hex = struct.pack('<I', ((0x14000000 & 0xfc000000) + (target_addr - cur_addr) // 4))
     else:
         offset = (((target_addr - cur_addr) // 4) << 5) & 0x00ffffe0
-        # XXX: The oppisite cond should be used instead of the original cond for aarch64/arm64
+        # XXX: The opposite cond should be used instead of the original cond for aarch64/arm64
         opcode = OPCODES['arm64']['b_cond'][b_cond.lower()]
         if opcode % 2 == 0:
             opcode += 1
