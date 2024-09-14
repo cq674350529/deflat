@@ -202,7 +202,7 @@ def main():
         if len(childs) == 1:
             parent_block = project.factory.block(parent.addr, size=parent.size)
             last_instr = parent_block.capstone.insns[-1]
-            file_offset = last_instr.address - base_addr
+            file_offset = project.loader.main_object.addr_to_offset(last_instr.address)
             # patch the last instruction to jmp
             if project.arch.name in ARCH_X86:
                 fill_nop(origin_data, file_offset,
