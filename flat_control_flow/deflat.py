@@ -194,7 +194,7 @@ def main():
 
     # patch irrelevant blocks
     for nop_node in nop_nodes:
-        fill_nop(origin_data, nop_node.addr-base_addr,
+        fill_nop(origin_data, project.loader.main_object.addr_to_offset(nop_node.addr),
                  nop_node.size, project.arch)
 
     # remove unnecessary control flows
@@ -224,10 +224,10 @@ def main():
             patch_instruction(origin_data, file_offset, patch_value)
         else:
             instr = patch_instrs[parent]
-            file_offset = instr.address - base_addr
+            file_offset = project.loader.main_object.addr_to_offset(instr.address)
             # patch instructions starting from `cmovx` to the end of block
-            fill_nop(origin_data, file_offset, parent.addr +
-                     parent.size - base_addr - file_offset, project.arch)
+            block_end_offset = project.loader.main_object.addr_to_offset(parent.addr + parent.size)
+            fill_nop(origin_data, file_offset, block_end_offset - file_offset, project.arch)
             if project.arch.name in ARCH_X86:
                 # patch the cmovx instruction to jx instruction
                 patch_value = ins_j_jmp_hex_x86(instr.address, childs[0], instr.mnemonic[len('cmov'):])
