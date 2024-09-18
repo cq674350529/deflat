@@ -65,7 +65,7 @@ def main():
 
         if node.addr not in flow:
             # patch unnecessary node
-            file_offset = node.addr - base_addr
+            file_offset = project.loader.main_object.addr_to_offset(node.addr)
             fill_nop(origin_data, file_offset, node.size, project.arch)
         else:
             suc_nodes = list(supergraph.successors(node))
@@ -76,7 +76,7 @@ def main():
                     jmp_targets.append(suc_node.addr)
                 else:
                     # patch unnecessary suc_node
-                    file_offset = suc_node.addr - base_addr
+                    file_offset = project.loader.main_object.addr_to_offset(suc_node.addr)
                     fill_nop(origin_data, file_offset,
                              suc_node.size, project.arch)
                     patch_nodes.add(suc_node.addr)
@@ -84,18 +84,18 @@ def main():
             # patch jmp instruction
             if len(suc_nodes) > 1 and len(jmp_targets) == 1:
                 if project.arch.name in ARCH_X86:
-                    file_offset = node.addr + node.size - 6 - base_addr
+                    file_offset = project.loader.main_object.addr_to_offset(node.addr + node.size) - 6
                     # nop + jmp
                     patch_value = OPCODES['x86']['nop'] + ins_j_jmp_hex_x86(node.addr + node.size - 5, jmp_targets[0], 'jmp')
                     patch_instruction(origin_data, file_offset, patch_value)
                 elif project.arch.name in ARCH_ARM:
-                    file_offset = node.addr + node.size - 4 - base_addr
+                    file_offset = project.loader.main_object.addr_to_offset(node.addr + node.size) - 4
                     patch_value = ins_b_jmp_hex_arm(node.addr + node.size - 4, jmp_targets[0], 'b')
                     if project.arch.memory_endness == 'Iend_BE':
                         patch_value = patch_value[::-1]
                     patch_instruction(origin_data, file_offset, patch_value)
                 elif project.arch.name in ARCH_ARM64:
-                    file_offset = node.addr + node.size - 4 - base_addr
+                    file_offset = project.loader.main_object.addr_to_offset(node.addr + node.size) - 4
                     patch_value = ins_b_jmp_hex_arm64(node.addr + node.size - 4, jmp_targets[0], 'b')
                     if project.arch.memory_endness == 'Iend_BE':
                         patch_value = patch_value[::-1]
